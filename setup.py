@@ -1,12 +1,12 @@
+#!/usr/bin/env python
+
 from distutils.core import setup
 setup(
    name='dorothea',
-   version='0.0.1',
-   description='Dorothea is a python package to compute TF activity using SCIRA\' linear models',
-   long_description=open('README.md').read(),
+   version='1.0',
+   description='Dorothea is a python package to compute TF activity from RNA-seq data using SCIRA method',
    author='Pau Badia i Mompel',
-   url='',
-   packages=['dorothea'],  
-   install_requires=['numpy >= 1.16.1'], 
+   url='https://github.com/saezlab/dorothea-py',
+   packages=['dorothea'], 
    license='LICENSE.txt'
 )
