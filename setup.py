@@ -8,5 +8,7 @@ setup(
    author='Pau Badia i Mompel',
    url='https://github.com/saezlab/dorothea-py',
    packages=['dorothea'], 
-   license='LICENSE.txt'
+   license='LICENSE.txt',
+   include_package_data=True,
+   package_data={'': ['data/dorothea_hs.pkl']}
 )
