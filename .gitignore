@@ -1,1 +1,6 @@
 data
+example/sciraR.ipynb
+example/viperR.ipynb
+example/cache/
+dorothea/__pycache__/
+example/.ipynb_checkpoints/*

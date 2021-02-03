@@ -8,6 +8,7 @@ import itertools
 import multiprocessing
 import pickle
 import pkg_resources
+from tqdm import tqdm
 
 
 def load_regulons(levels=['A', 'B', 'C', 'D', 'E']):
@@ -57,11 +58,15 @@ def run_scira(data, regnet, norm = None):
     """This function is a wrapper to run SCIRA using regulons."""
     # Transform to df if AnnData object is given
     if isinstance(data, AnnData):
-        data = pd.DataFrame(np.transpose(data.X), index=data.var.index, 
-                               columns=data.obs.index)
+        if data.raw is None:
+            data = pd.DataFrame(np.transpose(data.X), index=data.var.index, 
+                                   columns=data.obs.index)
+        else:
+            data = pd.DataFrame(np.transpose(data.raw.X.toarray()), index=data.raw.var.index, 
+                                   columns=data.raw.obs_names)
 
     # Get intersection of genes between expr data and the given regnet
-    common_v = set(data.index.values) & set(regnet.index.values)
+    common_v = sorted(set(data.index.values) & set(regnet.index.values))
     map1_idx = match(common_v, data.index.values)
     map2_idx = match(common_v, regnet.index.values)
 
@@ -87,7 +92,7 @@ def run_scira(data, regnet, norm = None):
     nregnet = np.array(regnet)[map2_idx,]
     
     # Compute TF activity and generate a new AnnData object
-    tf_data = AnnData(np.array([[InferTFact(tf_v, expr_v) for tf_v in nregnet.T] for expr_v in ndata.T]))
+    tf_data = AnnData(np.array([[InferTFact(tf_v, expr_v) for tf_v in nregnet.T] for expr_v in tqdm(ndata.T)]))
     tf_data.X[np.isnan(tf_data.X)] = 0.0
     tf_data.obs.index = data.columns
     tf_data.var.index = regnet.columns
