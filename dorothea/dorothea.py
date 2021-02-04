@@ -45,14 +45,24 @@ def match(x, table):
     m = [table.index(i) for i in x]
     return np.array(m)
 
-def InferTFact(tf_v, expr_v):
-    """Computes the TF activity by buidling a lm where x is the 
-    regulon and y is the observed expression"""
-    # Build lm
-    slope, _, _, _, std_err = stats.linregress(x=tf_v, y=expr_v)
-    # t-stat is the TF act, which is equal to slope/std_err
-    tf_act = slope/std_err
+
+def InferTFact(tf_m, exp_v):
+    """Computes the activity of all TFs for a given cell"""
+    TINY = 1.0e-20
+    # Each row is a TF and a exp
+    n_repeat, df = tf_m.shape
+    # Repeat exp for each tf
+    exp_m = np.repeat([exp_v], n_repeat, axis=0)
+    # Compute lm
+    cov = np.cov(tf_m, exp_m, bias=1)
+    ssxm, ssym = np.split(np.diag(cov), 2)
+    ssxym = np.diag(cov, k=len(tf_m))
+    # Compute R value
+    r = ssxym / np.sqrt(ssxm * ssym)
+    # Compute t-value = TF activity
+    tf_act = r * np.sqrt(df / ((1.0 - r + TINY)*(1.0 + r + TINY)))
     return tf_act
+
 
 def run_scira(data, regnet, norm = None):
     """This function is a wrapper to run SCIRA using regulons."""
@@ -73,6 +83,7 @@ def run_scira(data, regnet, norm = None):
     if norm == "c":
         # Centering
         ndata = np.array(data)[map1_idx,] - np.matrix(np.mean(np.array(data)[map1_idx,], axis=1)).transpose()
+        ndata = np.asarray(ndata)
     elif norm == "z":
         # Compute sd_v per gene
         sd_v = np.std(np.array(data)[map1_idx,], axis=1)
@@ -88,11 +99,12 @@ def run_scira(data, regnet, norm = None):
     else:
         ndata = np.array(data)[map1_idx,]
        
-    # Order and filter regnet
-    nregnet = np.array(regnet)[map2_idx,]
-    
+    # Order, filter and transpose (each row is tf and exp vector)
+    nregnet = np.array(regnet)[map2_idx,].T
+    ndata = ndata.T
     # Compute TF activity and generate a new AnnData object
-    tf_data = AnnData(np.array([[InferTFact(tf_v, expr_v) for tf_v in nregnet.T] for expr_v in tqdm(ndata.T)]))
+    tf_data = AnnData(np.array([InferTFact(nregnet, expr_v) for expr_v in tqdm(ndata)]))
+    # Set nans to 0
     tf_data.X[np.isnan(tf_data.X)] = 0.0
     tf_data.obs.index = data.columns
     tf_data.var.index = regnet.columns
