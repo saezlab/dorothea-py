@@ -10,5 +10,5 @@ setup(
    packages=['dorothea'], 
    license='LICENSE.txt',
    include_package_data=True,
-   package_data={'': ['data/dorothea_hs.pkl']}
+   package_data={'dorothea': ['data/dorothea_hs.pkl']}
 )
