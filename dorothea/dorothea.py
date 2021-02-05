@@ -1,19 +1,19 @@
 import pandas as pd
 import numpy as np
-from scipy import stats
-from tqdm import tqdm
 import scanpy as sc
 from anndata import AnnData
-import itertools
-import multiprocessing
 import pickle
 import pkg_resources
-from tqdm import tqdm
 
 
-def load_regulons(levels=['A', 'B', 'C', 'D', 'E']):
+def load_regulons(levels=['A', 'B', 'C', 'D', 'E'], organism='Human'):
     # Get package path
-    path = pkg_resources.resource_filename(__name__, 'data/dorothea_hs.pkl')
+    if organism == "Human":
+        path = pkg_resources.resource_filename(__name__, 'data/dorothea_hs.pkl')
+    elif organism == "Mouse":
+        path = pkg_resources.resource_filename(__name__, 'data/dorothea_mm.pkl')
+    else:
+        raise("Wrong organism name. Please specify 'Human' or 'Mouse'.")
     
     # Open pickle object
     df = pickle.load(open(path, "rb" ))
@@ -27,16 +27,16 @@ def load_regulons(levels=['A', 'B', 'C', 'D', 'E']):
     map_genes = {gene:i for i,gene in enumerate(genes)}
     map_tfs = {tf:i for i,tf in enumerate(tfs)}
     
-    dorothea_hs = np.zeros((len(genes), len(tfs)))
+    dorothea_df = np.zeros((len(genes), len(tfs)))
     for index, row in df.iterrows():
         tf = row['tf']
         gene = row['target']
         mor = int(row['mor'])
-        dorothea_hs[map_genes[gene], map_tfs[tf]] = mor
+        dorothea_df[map_genes[gene], map_tfs[tf]] = mor
         
-    dorothea_hs = pd.DataFrame(dorothea_hs, columns=tfs, index=genes)
+    dorothea_df = pd.DataFrame(dorothea_df, columns=tfs, index=genes)
     
-    return dorothea_hs
+    return dorothea_df
 
 def match(x, table):
     """Returns a vector of the positions of (first) matches of 
@@ -82,8 +82,8 @@ def run_scira(data, regnet, norm = None):
 
     if norm == "c":
         # Centering
-        ndata = np.array(data)[map1_idx,] - np.matrix(np.mean(np.array(data)[map1_idx,], axis=1)).transpose()
-        ndata = np.asarray(ndata)
+        ndata = np.array(data)[map1_idx,]
+        ndata = ndata - np.mean(ndata, axis=1, keepdims=True)
     elif norm == "z":
         # Compute sd_v per gene
         sd_v = np.std(np.array(data)[map1_idx,], axis=1)
@@ -103,7 +103,7 @@ def run_scira(data, regnet, norm = None):
     nregnet = np.array(regnet)[map2_idx,].T
     ndata = ndata.T
     # Compute TF activity and generate a new AnnData object
-    tf_data = AnnData(np.array([InferTFact(nregnet, expr_v) for expr_v in tqdm(ndata)]))
+    tf_data = AnnData(np.array([InferTFact(nregnet, expr_v) for expr_v in ndata]))
     # Set nans to 0
     tf_data.X[np.isnan(tf_data.X)] = 0.0
     tf_data.obs.index = data.columns
