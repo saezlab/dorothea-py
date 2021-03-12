@@ -64,49 +64,53 @@ def InferTFact(tf_m, exp_v):
     return tf_act
 
 
-def run_scira(data, regnet, norm = None):
+def run_scira(data, regnet, norm='c', inplace=True, scale=True):
     """This function is a wrapper to run SCIRA using regulons."""
     # Transform to df if AnnData object is given
     if isinstance(data, AnnData):
         if data.raw is None:
-            data = pd.DataFrame(np.transpose(data.X), index=data.var.index, 
+            df = pd.DataFrame(np.transpose(data.X), index=data.var.index, 
                                    columns=data.obs.index)
+
         else:
-            data = pd.DataFrame(np.transpose(data.raw.X.toarray()), index=data.raw.var.index, 
+            df = pd.DataFrame(np.transpose(data.raw.X.toarray()), index=data.raw.var.index, 
                                    columns=data.raw.obs_names)
 
     # Get intersection of genes between expr data and the given regnet
-    common_v = sorted(set(data.index.values) & set(regnet.index.values))
-    map1_idx = match(common_v, data.index.values)
+    common_v = sorted(set(df.index.values) & set(regnet.index.values))
+    map1_idx = match(common_v, df.index.values)
     map2_idx = match(common_v, regnet.index.values)
 
     if norm == "c":
         # Centering
-        ndata = np.array(data)[map1_idx,]
+        ndata = np.array(df)[map1_idx,]
         ndata = ndata - np.mean(ndata, axis=1, keepdims=True)
-    elif norm == "z":
-        # Compute sd_v per gene
-        sd_v = np.std(np.array(data)[map1_idx,], axis=1)
-        # Check genes where std > 0
-        nz_idx = np.where(sd_v > 0)[0]
-        z_idx = np.where(sd_v == 0)[0]
-        ndata = np.array(data)[map1_idx,]
-        # Z-score normalize
-        ndata[nz_idx,] = (np.array(data)[map1_idx[nz_idx],] - 
-                         np.matrix(np.mean(np.array(data)[map1_idx[nz_idx],], 
-                                           axis=1)).transpose()) / np.matrix(sd_v[nz_idx]).transpose()
-        ndata[z_idx,] = 0
     else:
         ndata = np.array(data)[map1_idx,]
        
     # Order, filter and transpose (each row is tf and exp vector)
     nregnet = np.array(regnet)[map2_idx,].T
     ndata = ndata.T
-    # Compute TF activity and generate a new AnnData object
-    tf_data = AnnData(np.array([InferTFact(nregnet, expr_v) for expr_v in ndata]))
-    # Set nans to 0
-    tf_data.X[np.isnan(tf_data.X)] = 0.0
-    tf_data.obs.index = data.columns
-    tf_data.var.index = regnet.columns
     
-    return tf_data
+    # Compute TF activities
+    result = np.array([InferTFact(nregnet, expr_v) for expr_v in ndata])
+    
+    # Set nans to 0
+    result[np.isnan(result)] = 0.0
+    
+    if scale:
+        std = np.std(result, ddof=1, axis=0)
+        std[std == 0] = 1
+        result = (result - np.mean(result, axis=0)) / std
+    
+    # Store in df
+    result = pd.DataFrame(result, columns=regnet.columns, index=df.columns)
+
+    if isinstance(data, AnnData) and inplace:
+        # Update AnnData object
+        data.obsm['dorothea'] = result
+    else:
+        # Return dataframe object
+        data = result
+
+    return data if not inplace else None
