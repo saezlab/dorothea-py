@@ -91,6 +91,9 @@ def run_scira(data, regnet, norm='c', inplace=True, scale=True):
                                    columns=data.raw.obs_names)
     else:
         df = data
+        
+    assert df.shape[1] != 1 and (norm is None or scale), \
+    'If there is only one observation no scaling nor norm can be performed!'
 
     # Get intersection of genes between expr data and the given regnet
     common_v = sorted(set(df.index.values) & set(regnet.index.values))
@@ -102,7 +105,7 @@ def run_scira(data, regnet, norm='c', inplace=True, scale=True):
         ndata = np.array(df)[map1_idx,]
         ndata = ndata - np.mean(ndata, axis=1, keepdims=True)
     else:
-        ndata = np.array(data)[map1_idx,]
+        ndata = np.array(df)[map1_idx,]
        
     # Order, filter and transpose (each row is tf and exp vector)
     nregnet = np.array(regnet)[map2_idx,].T
