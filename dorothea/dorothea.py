@@ -65,7 +65,21 @@ def InferTFact(tf_m, exp_v):
 
 
 def run_scira(data, regnet, norm='c', inplace=True, scale=True):
-    """This function is a wrapper to run SCIRA using regulons."""
+    """
+    This function is a wrapper to run SCIRA using regulons
+    
+    Params
+    ------
+    data
+        If `AnnData`, the annotated data matrix of shape `n_obs` × `n_vars`.
+        Rows correspond to cells and columns to genes.
+        If `pandas` data frame, the annotated data matrix of shape `n_vars` × `n_obs`.
+    inplace:
+        Whether to update `adata` or return pandas df of activities.
+    Returns
+    -------
+    Returns pathway activities for each sample.
+    """
     # Transform to df if AnnData object is given
     if isinstance(data, AnnData):
         if data.raw is None:
@@ -75,6 +89,8 @@ def run_scira(data, regnet, norm='c', inplace=True, scale=True):
         else:
             df = pd.DataFrame(np.transpose(data.raw.X.toarray()), index=data.raw.var.index, 
                                    columns=data.raw.obs_names)
+    else:
+        df = data
 
     # Get intersection of genes between expr data and the given regnet
     common_v = sorted(set(df.index.values) & set(regnet.index.values))
