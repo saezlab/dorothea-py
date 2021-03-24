@@ -22,108 +22,76 @@ def load_regulons(levels=['A', 'B', 'C', 'D', 'E'], organism='Human'):
     df = df[df['confidence'].isin(levels)]
     
     # Transform to binary dataframe
-    genes = np.unique(df.target)
-    tfs = np.unique(df.tf)
-    map_genes = {gene:i for i,gene in enumerate(genes)}
-    map_tfs = {tf:i for i,tf in enumerate(tfs)}
+    dorothea_df = df.pivot(index='target', columns='tf', values='mor')
     
-    dorothea_df = np.zeros((len(genes), len(tfs)))
-    for index, row in df.iterrows():
-        tf = row['tf']
-        gene = row['target']
-        mor = int(row['mor'])
-        dorothea_df[map_genes[gene], map_tfs[tf]] = mor
-        
-    dorothea_df = pd.DataFrame(dorothea_df, columns=tfs, index=genes)
+    # Set nans to 0
+    dorothea_df[np.isnan(dorothea_df)] = 0
     
     return dorothea_df
 
-def match(x, table):
-    """Returns a vector of the positions of (first) matches of 
-    its first argument in its second"""
-    table = list(table)
-    m = [table.index(i) for i in x]
-    return np.array(m)
-
-
-def InferTFact(tf_m, exp_v):
-    """Computes the activity of all TFs for a given cell"""
-    TINY = 1.0e-20
-    # Each row is a TF and a exp
-    n_repeat, df = tf_m.shape
-    # Repeat exp for each tf
-    exp_m = np.repeat([exp_v], n_repeat, axis=0)
-    # Compute lm
-    cov = np.cov(tf_m, exp_m, bias=1)
-    ssxm, ssym = np.split(np.diag(cov), 2)
-    ssxym = np.diag(cov, k=len(tf_m))
-    # Compute R value
-    r = ssxym / np.sqrt(ssxm * ssym)
-    # Compute t-value = TF activity
-    tf_act = r * np.sqrt(df / ((1.0 - r + TINY)*(1.0 + r + TINY)))
-    return tf_act
-
-
-def run_scira(data, regnet, norm='c', inplace=True, scale=True):
-    """
-    This function is a wrapper to run SCIRA using regulons
+def extract(data, obsm_key='dorothea'):
+    obsm = data.obsm
+    obs = data.obs
+    df = data.obsm['dorothea']
+    var = pd.DataFrame(index=df.columns)
+    tadata = AnnData(np.array(df), obs=obs, var=var, obsm=obsm)
+    return tadata
     
-    Params
-    ------
-    data
-        If `AnnData`, the annotated data matrix of shape `n_obs` × `n_vars`.
-        Rows correspond to cells and columns to genes.
-        If `pandas` data frame, the annotated data matrix of shape `n_vars` × `n_obs`.
-    inplace:
-        Whether to update `adata` or return pandas df of activities.
-    Returns
-    -------
-    Returns pathway activities for each sample.
-    """
-    # Transform to df if AnnData object is given
+
+def process_input(data):
     if isinstance(data, AnnData):
         if data.raw is None:
-            df = pd.DataFrame(np.transpose(data.X), index=data.var.index, 
-                                   columns=data.obs.index)
-
+            genes = np.array(data.var.index)
+            idx = np.argsort(genes)
+            genes = genes[idx]
+            samples = data.obs.index
+            X = data.X[:,idx]
         else:
-            df = pd.DataFrame(np.transpose(data.raw.X.toarray()), index=data.raw.var.index, 
-                                   columns=data.raw.obs_names)
+            genes = np.array(data.raw.var.index)
+            idx = np.argsort(genes)
+            genes = genes[idx]
+            samples= data.raw.obs_names
+            X = data.raw.X[:,idx]
+    elif isinstance(data, pd.DataFrame):
+        genes = np.array(df.columns)
+        idx = np.argsort(genes)
+        genes = genes[idx]
+        samples = df.index
+        X = np.array(df)[:,idx]
     else:
-        df = data
-        
-    assert not (df.shape[1] <= 1 and (norm is None or scale)), \
-    'If there is only one observation no scaling nor norm can be performed!'
+        raise ValueError('Input must be AnnData or pandas DataFrame.')
+    return genes, samples, X
 
-    # Get intersection of genes between expr data and the given regnet
-    common_v = sorted(set(df.index.values) & set(regnet.index.values))
-    map1_idx = match(common_v, df.index.values)
-    map2_idx = match(common_v, regnet.index.values)
+def run(data, regnet, center=True, scale=True, inplace=True):
+    # Get genes, samples/tfs and matrices from data and regnet
+    x_genes, x_samples, X = process_input(data)
+    if X.shape[0] <= 1 and (center or scale):
+        raise ValueError('If there is only one observation no centering nor scaling can be performed.')
+    r_genes, r_tfs, R = np.sort(regnet.index), regnet.columns, np.array(regnet)
 
-    if norm == "c":
-        # Centering
-        ndata = np.array(df)[map1_idx,]
-        ndata = ndata - np.mean(ndata, axis=1, keepdims=True)
-    else:
-        ndata = np.array(df)[map1_idx,]
-       
-    # Order, filter and transpose (each row is tf and exp vector)
-    nregnet = np.array(regnet)[map2_idx,].T
-    ndata = ndata.T
-    
-    # Compute TF activities
-    result = np.array([InferTFact(nregnet, expr_v) for expr_v in ndata])
-    
-    # Set nans to 0
-    result[np.isnan(result)] = 0.0
-    
+    # Subset by common genes
+    common_genes = np.sort(list(set(r_genes) & set(x_genes)))
+    map_x = np.searchsorted(x_genes, common_genes)
+    map_r = np.searchsorted(r_genes, common_genes)
+    X = X[:,map_x]
+    R = R[map_r]
+
+    if center:
+        X = X - np.mean(X, axis=0)
+
+    # Run matrix mult
+    result = np.asarray(X.dot(R))
+
     if scale:
         std = np.std(result, ddof=1, axis=0)
         std[std == 0] = 1
         result = (result - np.mean(result, axis=0)) / std
-    
+
+    # Remove nans
+    result[np.isnan(result)] = 0
+
     # Store in df
-    result = pd.DataFrame(result, columns=regnet.columns, index=df.columns)
+    result = pd.DataFrame(result, columns=r_tfs, index=x_samples)
 
     if isinstance(data, AnnData) and inplace:
         # Update AnnData object
