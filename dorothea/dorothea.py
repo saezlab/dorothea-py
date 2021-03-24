@@ -92,7 +92,7 @@ def run_scira(data, regnet, norm='c', inplace=True, scale=True):
     else:
         df = data
         
-    assert df.shape[1] != 1 and (norm is None or scale), \
+    assert not (df.shape[1] <= 1 and (norm is None or scale)), \
     'If there is only one observation no scaling nor norm can be performed!'
 
     # Get intersection of genes between expr data and the given regnet
