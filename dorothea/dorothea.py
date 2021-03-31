@@ -38,9 +38,9 @@ def extract(data, obsm_key='dorothea'):
     return tadata
     
 
-def process_input(data):
+def process_input(data, use_raw=False):
     if isinstance(data, AnnData):
-        if data.raw is None:
+        if not use_raw:
             genes = np.array(data.var.index)
             idx = np.argsort(genes)
             genes = genes[idx]
@@ -62,19 +62,34 @@ def process_input(data):
         raise ValueError('Input must be AnnData or pandas DataFrame.')
     return genes, samples, X
 
-def run(data, regnet, center=True, scale=True, inplace=True):
+
+def run(data, regnet, center=True, scale=True, inplace=True, use_raw=False):
     # Get genes, samples/tfs and matrices from data and regnet
-    x_genes, x_samples, X = process_input(data)
+    x_genes, x_samples, X = process_input(data, use_raw=use_raw)
+
+    assert len(x_genes) == len(set(x_genes)), 'Gene names are not unique'
+
     if X.shape[0] <= 1 and (center or scale):
         raise ValueError('If there is only one observation no centering nor scaling can be performed.')
-    r_genes, r_tfs, R = np.sort(regnet.index), regnet.columns, np.array(regnet)
+
+    # Sort targets (rows) alphabetically
+    regnet = regnet.sort_index()
+    r_targets, r_tfs = regnet.index, regnet.columns
+
+    assert len(r_targets) == len(set(r_targets)), 'regnet target names are not unique'
+    assert len(r_tfs) == len(set(r_tfs)), 'regnet tf names are not unique'
 
     # Subset by common genes
-    common_genes = np.sort(list(set(r_genes) & set(x_genes)))
-    map_x = np.searchsorted(x_genes, common_genes)
-    map_r = np.searchsorted(r_genes, common_genes)
-    X = X[:,map_x]
-    R = R[map_r]
+    common_genes = np.sort(list(set(r_targets) & set(x_genes)))
+
+    target_fraction = len(common_genes) / len(r_targets)
+    assert target_fraction > .05, f'Too few ({len(common_genes)}) target genes found. Make sure you are using the correct organism.'
+
+    print(f'{len(common_genes)} targets found')
+
+    idx_x = np.searchsorted(x_genes, common_genes)
+    X = X[:,idx_x]
+    R = regnet.loc[common_genes].values
 
     if center:
         X = X - np.mean(X, axis=0)
