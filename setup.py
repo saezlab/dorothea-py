@@ -9,7 +9,7 @@ setup(
    url='https://github.com/saezlab/dorothea-py',
    packages=['dorothea'], 
    license='LICENSE.txt',
-   package_data={'dorothea': ['data/dorothea_hs.pkl', 'data/dorothea_mm.pkl']},
+   package_data={'dorothea': ['data/dorothea_hs.pkl', 'data/dorothea_mm.pkl', 'data/c_dorothea_hs.pkl', 'data/c_dorothea_mm.pkl']},
    install_requires=[
         'anndata',
         'scanpy',

@@ -4,16 +4,24 @@ import scanpy as sc
 from anndata import AnnData
 import pickle
 import pkg_resources
+import os
 
 
-def load_regulons(levels=['A', 'B', 'C', 'D', 'E'], organism='Human'):
+def load_regulons(levels=['A', 'B', 'C', 'D', 'E'], organism='Human', commercial=False):
     # Get package path
+    path = 'data'
+    fname = 'dorothea_'
+    
+    if commercial:
+        fname = 'c_' + fname
     if organism == "Human":
-        path = pkg_resources.resource_filename(__name__, 'data/dorothea_hs.pkl')
+        fname = fname + 'hs'
     elif organism == "Mouse":
-        path = pkg_resources.resource_filename(__name__, 'data/dorothea_mm.pkl')
+        fname = fname + 'mm'
     else:
         raise("Wrong organism name. Please specify 'Human' or 'Mouse'.")
+    fname = fname + '.pkl'
+    path = pkg_resources.resource_filename(__name__, os.path.join(path, fname))
     
     # Open pickle object
     df = pickle.load(open(path, "rb" ))
