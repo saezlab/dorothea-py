@@ -71,7 +71,7 @@ def process_input(data, use_raw=False):
     return genes, samples, X
 
 
-def run(data, regnet, center=True, scale=True, inplace=True, use_raw=False):
+def run(data, regnet, center=True, scale=True, inplace=True, norm=True, use_raw=False):
     # Get genes, samples/tfs and matrices from data and regnet
     x_genes, x_samples, X = process_input(data, use_raw=use_raw)
 
@@ -91,7 +91,8 @@ def run(data, regnet, center=True, scale=True, inplace=True, use_raw=False):
     common_genes = np.sort(list(set(r_targets) & set(x_genes)))
 
     target_fraction = len(common_genes) / len(r_targets)
-    assert target_fraction > .05, f'Too few ({len(common_genes)}) target genes found. Make sure you are using the correct organism.'
+    assert target_fraction > .05, f'Too few ({len(common_genes)}) target genes found. \
+    Make sure you are using the correct organism.'
 
     print(f'{len(common_genes)} targets found')
 
@@ -104,6 +105,12 @@ def run(data, regnet, center=True, scale=True, inplace=True, use_raw=False):
 
     # Run matrix mult
     result = np.asarray(X.dot(R))
+    
+    # Normalize by num edges
+    if norm:
+        norm = np.sum(np.abs(R), axis=0)
+        norm[norm == 0] = 1
+        result = result / norm
 
     if scale:
         std = np.std(result, ddof=1, axis=0)
