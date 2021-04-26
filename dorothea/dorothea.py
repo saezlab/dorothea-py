@@ -151,7 +151,7 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
         data.obsm['dorothea'] = result
     else:
         # Return dataframe object
-        data = result
+        inplace = False
 
     return data if not inplace else None
 
