@@ -4,3 +4,5 @@ example/viperR.ipynb
 example/cache/
 dorothea/__pycache__/
 example/.ipynb_checkpoints/*
+example/methods_exploration.ipynb
+example/sinfo-requirements.txt

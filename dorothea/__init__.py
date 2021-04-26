@@ -1,1 +1,1 @@
-from .dorothea import run, load_regulons, extract
+from .dorothea import *

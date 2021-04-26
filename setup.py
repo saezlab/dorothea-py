@@ -15,5 +15,6 @@ setup(
         'scanpy',
         'numpy',
         'pandas',
+        'tqdm'
    ]
 )
