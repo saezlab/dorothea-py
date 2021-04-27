@@ -191,8 +191,6 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
     # Run matrix mult
     estimate = mean_expr(X, R)
     
-    pos_msk = estimate > 0
-    neg_msk = estimate < 0
     # Permutations
     if num_perm > 0:
         pvals = np.zeros(estimate.shape)
