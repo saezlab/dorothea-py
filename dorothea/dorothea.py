@@ -10,6 +10,27 @@ from tqdm import tqdm
 
 
 def load_regulons(levels=['A', 'B', 'C', 'D', 'E'], organism='Human', commercial=False):
+    """
+    Loads DoRothEA's regulons.
+    
+    Parameters
+    ----------
+    levels
+        List of confidence levels to use. A regulons are the most confident, E the least.
+    organism
+        String determining which organism to use. Only `Human` and `Mouse` are supported.
+    commercial
+        Whether to use the academic or commercial version. 
+    
+    Returns
+    -------
+    DataFrame containing the relationships between gene targets (rows) and their TFs (columns). 
+
+    Examples
+    --------
+    >>> import dorothea
+    >>> regulons = dorothea.load_regulons(levels=['A'], organism='Human', commercial=False)
+    """
     # Get package path
     path = 'data'
     fname = 'dorothea_'
@@ -39,16 +60,46 @@ def load_regulons(levels=['A', 'B', 'C', 'D', 'E'], organism='Human', commercial
     
     return dorothea_df
 
-def extract(data, obsm_key='dorothea'):
-    obsm = data.obsm
-    obs = data.obs
-    df = data.obsm[obsm_key]
+def extract(adata, obsm_key='dorothea'):
+    """
+    Generates a new AnnData object with TF activities stored in `.obsm` instead of gene expression. 
+    
+    Parameters
+    ----------
+    adata
+        Annotated data matrix.
+    obsm_key
+        `.osbm` key where TF activities are stored.
+    
+    Returns
+    -------
+    AnnData object with TF activities
+    """
+    obsm = adata.obsm
+    obs = adata.obs
+    df = adata.obsm[obsm_key]
     var = pd.DataFrame(index=df.columns)
-    tadata = AnnData(np.array(df), obs=obs, var=var, obsm=obsm)
-    return tadata
+    tf_adata = AnnData(np.array(df), obs=obs, var=var, obsm=obsm)
+    return tf_adata
     
 
 def process_input(data, use_raw=False):
+    """
+    Processes different input types so that they can be used downstream. 
+    
+    Parameters
+    ----------
+    data
+        Annotated data matrix or DataFrame
+    use_raw
+        If data is an AnnData object, whether to use values stored in `.raw`.
+    
+    Returns
+    -------
+    genes : list of genes names
+    samples : list of sample names
+    X : gene expression matrix
+    """
     if isinstance(data, AnnData):
         if not use_raw:
             genes = np.array(data.var.index)
@@ -79,6 +130,35 @@ def mean_expr(X, R):
 
 
 def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis=0, inplace=True, use_raw=False):
+    """
+    Runs TF activity prediction from gene expression using DoRothEA's regulons.
+    
+    Parameters
+    ----------
+    data
+        Annotated data matrix or DataFrame.
+    regnet
+        Regulon network in DataFrame format.
+    center
+        Whether to center gene expression by cell/sample.
+    num_perm
+        Number of permutations to calculate p-vals of random activities.
+    norm
+        Whether to normalize activities per regulon size to correct for large regulons.
+    scale
+        Whether to scale the final activities.
+    scale_axis
+        0 to scale per feature, 1 to scale per cell/sample.
+    inplace
+        If `data` is an AnnData object, whether to update `data` or return a DataFrame.
+    use_raw
+        If data is an AnnData object, whether to use values stored in `.raw`.
+    
+    Returns
+    -------
+    Returns a DataFrame with TF activities or adds it to the `.obsm` key 'dorothea' 
+    of the input AnnData object, depending on `inplace` and input data type.
+    """
     # Get genes, samples/tfs and matrices from data and regnet
     x_genes, x_samples, X = process_input(data, use_raw=use_raw)
 
@@ -157,6 +237,24 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
     return data if not inplace else None
 
 def rank_tfs_groups(adata, groupby, group, reference='all'):
+    """
+    Runs Wilcoxon rank-sum test between one group and a reference group.
+    
+    Parameters
+    ----------
+    adata
+        Annotated data matrix.
+    groupby
+        The key of the observations grouping to consider.
+    group
+        Group or list of groups to compare.
+    reference
+        Reference group or list of reference groups to use as reference.
+    
+    Returns
+    -------
+    DataFrame with changes in TF activity between groups.
+    """
     from scipy.stats import ranksums
     from statsmodels.stats.multitest import multipletests
 
