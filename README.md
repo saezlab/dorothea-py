@@ -1,6 +1,6 @@
 # dorothea-py
 This is a Python implementation of the package [DoRothEA](https://github.com/saezlab/dorothea) for Transcript Factor activity prediction from transcriptomics data.
-In this implementation, DoRothEA is coupled with the statistical method [SCIRA](https://github.com/WangNing0420/SCIRA) and uses the [scanpy](https://github.com/theislab/scanpy) framework. 
+In this implementation, DoRothEA is coupled with normalized mean as statistic and uses the [scanpy](https://github.com/theislab/scanpy) framework. 
 
 
 ## Installation
@@ -23,7 +23,11 @@ Beside the original paper there are two additional papers expanding the usage of
 
 
 ## Usage of DoRothEA for commercial purpose
-DoRothEA as it stands is intended only for academic use as in contains resources whose licenses don't permit commerical use. However, we developed a non-academic version of DoRothEA by removing those resources (mainly TRED from the curated databases). You find the non-academic package with the regulons [here](https://github.com/saezlab/dorothea/tree/non-academic).
+DoRothEA as it stands is intended only for academic use as in contains resources whose licenses don't permit commerical use. However, we developed a non-academic version of DoRothEA by removing those resources (mainly TRED from the curated databases). To access the commercial version run:
+```
+import dorothea
+dorothea.load_regulons(commercial=True)
+```
 
 ## History
 Initially DoRothEA was a framework of **D**iscriminant **R**egulon **E**xpression **A**nalysis, as described in [Garcia-Alonso et al., 2017](https://cancerres.aacrjournals.org/content/early/2017/12/09/0008-5472.CAN-17-1679). At that time DoRothEA was used with a smaller set of regulons to find associations between TF activities and drug responses. Those results are queryable at [Open Targets](https://dorothea.opentargets.io/). Over the past years DoRothEA evolved from the analytical framework to a pure regulon resource as it is now.
