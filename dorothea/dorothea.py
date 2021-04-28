@@ -129,7 +129,7 @@ def mean_expr(X, R):
     return tf_act
 
 
-def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis=0, inplace=True, use_raw=False):
+def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis=0, inplace=True, use_raw=False, obsm_key='dorothea'):
     """
     Runs TF activity prediction from gene expression using DoRothEA's regulons.
     
@@ -153,6 +153,8 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
         If `data` is an AnnData object, whether to update `data` or return a DataFrame.
     use_raw
         If data is an AnnData object, whether to use values stored in `.raw`.
+    obsm_key
+        `.osbm` key where TF activities will be stored.
     
     Returns
     -------
@@ -226,7 +228,7 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
 
     if isinstance(data, AnnData) and inplace:
         # Update AnnData object
-        data.obsm['dorothea'] = result
+        data.obsm[obsm_key] = result
     else:
         # Return dataframe object
         data = result
@@ -234,7 +236,7 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
 
     return data if not inplace else None
 
-def rank_tfs_groups(adata, groupby, group, reference='all'):
+def rank_tfs_groups(adata, groupby, group, reference='all', obsm_key='dorothea'):
     """
     Runs Wilcoxon rank-sum test between one group and a reference group.
     
@@ -248,6 +250,8 @@ def rank_tfs_groups(adata, groupby, group, reference='all'):
         Group or list of groups to compare.
     reference
         Reference group or list of reference groups to use as reference.
+    obsm_key
+         `.osbm` key to use to extract TF activities.
     
     Returns
     -------
@@ -257,7 +261,7 @@ def rank_tfs_groups(adata, groupby, group, reference='all'):
     from statsmodels.stats.multitest import multipletests
 
     # Get TF activites
-    adata = extract(adata)
+    adata = extract(adata, obsm_key=obsm_key)
     
     # Get tf names
     features = adata.var.index.values
