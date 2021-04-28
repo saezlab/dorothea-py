@@ -9,6 +9,9 @@ from numpy.random import default_rng
 from tqdm import tqdm
 
 
+"""TF activity prediction in Python"""
+
+
 def load_regulons(levels=['A', 'B', 'C', 'D', 'E'], organism='Human', commercial=False):
     """
     Loads DoRothEA's regulons.
@@ -128,6 +131,16 @@ def mean_expr(X, R):
     tf_act = np.asarray(X.dot(R))
     return tf_act
 
+def scale_arr(X, scale_axis):
+    std = np.std(X, ddof=1, axis=scale_axis)
+    std[std == 0] = 1
+    mean = np.mean(X, axis=scale_axis)
+    if scale_axis == 0:
+        X = (X - mean) / std
+    elif scale_axis == 1:
+            X = (X - mean.reshape(-1,1)) / std.reshape(-1,1)
+    return X
+
 
 def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis=0, inplace=True, use_raw=False, obsm_key='dorothea', min_size=5):
     """
@@ -224,13 +237,7 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
     
     # Scale output
     if scale:
-        std = np.std(tf_act, ddof=1, axis=scale_axis)
-        std[std == 0] = 1
-        mean = np.mean(tf_act, axis=scale_axis)
-        if scale_axis == 0:
-            tf_act = (tf_act - mean) / std
-        elif scale_axis == 1:
-            tf_act = (tf_act - mean.reshape(-1,1)) / std.reshape(-1,1)
+        tf_act = scale_arr(tf_act, scale_axis)
 
     # Store in df
     result = pd.DataFrame(tf_act, columns=r_tfs, index=x_samples)
