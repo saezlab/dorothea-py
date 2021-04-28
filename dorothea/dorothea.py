@@ -129,7 +129,7 @@ def mean_expr(X, R):
     return tf_act
 
 
-def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis=0, inplace=True, use_raw=False, obsm_key='dorothea'):
+def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis=0, inplace=True, use_raw=False, obsm_key='dorothea', min_size=5):
     """
     Runs TF activity prediction from gene expression using DoRothEA's regulons.
     
@@ -155,6 +155,8 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
         If data is an AnnData object, whether to use values stored in `.raw`.
     obsm_key
         `.osbm` key where TF activities will be stored.
+    min_size
+        TFs with regulons with less targets than `min_size` will be ignored.
     
     Returns
     -------
@@ -189,6 +191,13 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
     idx_x = np.searchsorted(x_genes, common_genes)
     X = X[:,idx_x]
     R = regnet.loc[common_genes].values
+    
+    # Check min size and filter
+    msk_size = np.sum(R != 0, axis=0) < min_size
+    num_small_reg = np.sum(msk_size)
+    if num_small_reg > 0:
+        print(f'{num_small_reg} TFs with < {min_size} targets')
+        R[:, msk_size] = 0
 
     # Run matrix mult
     estimate = mean_expr(X, R)
