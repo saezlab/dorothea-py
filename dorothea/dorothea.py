@@ -126,7 +126,7 @@ def process_input(data, use_raw=False):
         raise ValueError('Input must be AnnData or pandas DataFrame.')
     return genes, samples, X
 
-def mean_expr(X, R):
+def dot_mult(X, R):
     # Run matrix mult
     tf_act = np.asarray(X.dot(R))
     return tf_act
@@ -213,13 +213,13 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
         R[:, msk_size] = 0
 
     # Run matrix mult
-    estimate = mean_expr(X, R)
+    estimate = dot_mult(X, R)
     
     # Permutations
     if num_perm > 0:
         pvals = np.zeros(estimate.shape)
         for i in tqdm(range(num_perm)):
-            perm = mean_expr(X, default_rng(seed=i).permutation(R))
+            perm = dot_mult(X, default_rng(seed=i).permutation(R))
             pvals += np.abs(perm) > np.abs(estimate)
         pvals = pvals / num_perm
         pvals[pvals == 0] = 1/num_perm
