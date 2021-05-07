@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     
 setuptools.setup(
     name="dorothea-py",
-    version="0.0.1",
+    version="1.0.0",
     author="Pau Badia i Mompel",
     author_email="pau.badia@uni-heidelberg.de",
     description="dorothea-py is a python package to compute TF activity \
