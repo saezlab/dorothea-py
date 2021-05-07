@@ -1,6 +1,6 @@
 # dorothea-py
 This is a Python implementation of the package [DoRothEA](https://github.com/saezlab/dorothea) for Transcript Factor activity prediction from transcriptomics data.
-In this implementation, DoRothEA is coupled with normalized mean as statistic and uses the [scanpy](https://github.com/theislab/scanpy) framework. 
+In this implementation, DoRothEA is coupled with gene mean expression as statistic and uses the [scanpy](https://github.com/theislab/scanpy) framework. 
 
 
 ## Installation
@@ -8,6 +8,9 @@ The package can easly be installed using pip
 ```
 pip install git+https://github.com/saezlab/dorothea-py.git
 ```
+
+## Examples
+Jupyter notebooks explaining the method and the package can be found in the `example/` directory.
 
 ## Citing DoRothEA
 Beside the original paper there are two additional papers expanding the usage of DoRothEA regulons.

@@ -6,3 +6,5 @@ dorothea/__pycache__/
 example/.ipynb_checkpoints/*
 example/methods_exploration.ipynb
 example/sinfo-requirements.txt
+dist/
+dorothea/dorothea_py.egg-info/
