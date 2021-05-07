@@ -6,7 +6,7 @@ In this implementation, DoRothEA is coupled with gene mean expression as statist
 ## Installation
 The package can easly be installed using pip
 ```
-pip install git+https://github.com/saezlab/dorothea-py.git
+pip install dorothea-py
 ```
 
 ## Examples
