@@ -86,7 +86,7 @@ def extract(adata, obsm_key='dorothea'):
     return tf_adata
     
 
-def process_input(data, use_raw=False):
+def process_input(data, use_raw=False, use_hvg=False):
     """
     Processes different input types so that they can be used downstream. 
     
@@ -96,6 +96,8 @@ def process_input(data, use_raw=False):
         Annotated data matrix or DataFrame
     use_raw
         If data is an AnnData object, whether to use values stored in `.raw`.
+    use_hvg
+        If data is an AnnData object, whether to only use high variable genes.
     
     Returns
     -------
@@ -110,12 +112,20 @@ def process_input(data, use_raw=False):
             genes = genes[idx]
             samples = data.obs.index
             X = data.X[:,idx]
+            if use_hvg:
+                hvg_msk = data.var.loc[genes].highly_variable
+                X = X[:,hvg_msk]
+                genes = genes[hvg_msk]
         else:
             genes = np.array(data.raw.var.index)
             idx = np.argsort(genes)
             genes = genes[idx]
             samples= data.raw.obs_names
             X = data.raw.X[:,idx]
+            if use_hvg:
+                hvg_msk = data.raw.var.loc[genes].highly_variable
+                X = X[:,hvg_msk]
+                genes = genes[hvg_msk]
     elif isinstance(data, pd.DataFrame):
         genes = np.array(data.columns)
         idx = np.argsort(genes)
@@ -142,7 +152,8 @@ def scale_arr(X, scale_axis):
     return X
 
 
-def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis=0, inplace=True, use_raw=False, obsm_key='dorothea', min_size=5):
+def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis=0, inplace=True, 
+        use_raw=False, use_hvg=False, obsm_key='dorothea', min_size=5):
     """
     Runs TF activity prediction from gene expression using DoRothEA's regulons.
     
@@ -166,6 +177,8 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
         If `data` is an AnnData object, whether to update `data` or return a DataFrame.
     use_raw
         If data is an AnnData object, whether to use values stored in `.raw`.
+    use_hvg
+        If data is an AnnData object, whether to only use high variable genes.
     obsm_key
         `.osbm` key where TF activities will be stored.
     min_size
@@ -177,7 +190,7 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
     of the input AnnData object, depending on `inplace` and input data type.
     """
     # Get genes, samples/tfs and matrices from data and regnet
-    x_genes, x_samples, X = process_input(data, use_raw=use_raw)
+    x_genes, x_samples, X = process_input(data, use_raw=use_raw, use_hvg=use_hvg)
 
     assert len(x_genes) == len(set(x_genes)), 'Gene names are not unique'
     
@@ -307,12 +320,13 @@ def rank_tfs_groups(adata, groupby, group, reference='all', obsm_key='dorothea')
     results = []
     for i in np.arange(len(features)):
         stat, pval = ranksums(adata.X[g_msk,i], adata.X[ref_msk,i])
-        results.append([features[i], group, reference, stat, pval])
+        mc = np.mean(adata.X[g_msk,i]) - np.mean(adata.X[ref_msk,i])
+        results.append([features[i], group, reference, stat, mc, pval])
 
     # Tranform to df
     results = pd.DataFrame(
         results, 
-        columns=['name', 'group', 'reference', 'statistic', 'pval']
+        columns=['name', 'group', 'reference', 'statistic', 'meanchange', 'pval']
     ).set_index('name')
     
     # Correct pvalues by FDR
@@ -323,5 +337,6 @@ def rank_tfs_groups(adata, groupby, group, reference='all', obsm_key='dorothea')
     results['pval_adj'] = pvals_adj
     
     # Sort by statistic
-    results = results.sort_values('statistic', ascending=False)
+    results = results.sort_values('meanchange', ascending=False)
     return results
+
