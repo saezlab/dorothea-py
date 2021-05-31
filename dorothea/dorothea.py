@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from scipy.sparse import csr_matrix
 import scanpy as sc
 from anndata import AnnData
 import pickle
@@ -7,6 +8,8 @@ import pkg_resources
 import os
 from numpy.random import default_rng
 from tqdm import tqdm
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 """TF activity prediction in Python"""
@@ -134,7 +137,7 @@ def process_input(data, use_raw=False, use_hvg=False):
         X = np.array(data)[:,idx]
     else:
         raise ValueError('Input must be AnnData or pandas DataFrame.')
-    return genes, samples, X
+    return genes, samples, csr_matrix(X)
 
 def dot_mult(X, R):
     # Run matrix mult
@@ -149,6 +152,15 @@ def scale_arr(X, scale_axis):
         X = (X - mean) / std
     elif scale_axis == 1:
             X = (X - mean.reshape(-1,1)) / std.reshape(-1,1)
+    return X
+
+
+def center_arr(X):
+    X = X.copy()
+    sums = np.squeeze(X.sum(1).A)
+    counts = np.diff(X.tocsr().indptr)
+    means = sums/counts
+    X.data -= np.repeat(means, counts)
     return X
 
 
@@ -196,7 +208,7 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
     
     # Center gene expresison by cell
     if center:
-        X = X - np.mean(X, axis=1).reshape(-1,1)
+        X = center_arr(X)
 
     # Sort targets (rows) alphabetically
     regnet = regnet.sort_index()
@@ -340,3 +352,96 @@ def rank_tfs_groups(adata, groupby, group, reference='all', obsm_key='dorothea')
     results = results.sort_values('meanchange', ascending=False)
     return results
 
+
+def check_regulon(adata, regnet, tf, groupby, use_raw=False, use_hvg=False, figsize=(12,6), 
+                  cmap='rocket', show=None, return_fig=None):
+    """
+    Plots a heatmap with the expression of target genes for a given TF.
+    
+    Parameters
+    ----------
+    adata
+        Annotated data matrix.
+    regnet
+        Regulon network in DataFrame format.
+    tf
+        Name of TF.
+    groupby
+        The key of the observations grouping to consider.
+    use_raw
+        If data is an AnnData object, whether to use values stored in `.raw`.
+    use_hvg
+        If data is an AnnData object, whether to only use high variable genes.
+    figsize
+        Size of the figure.
+    cmap
+        Color map to use.
+    show
+        Show the plot, do not return axis.
+    return_fig
+        Return the matplotlib figure.
+    Returns
+    -------
+    Heatmap figure.
+    """
+    # Get genes, samples/tfs and matrices from data and regnet
+    x_genes, x_samples, X = process_input(adata, use_raw=use_raw, use_hvg=use_hvg)
+
+    # Sort targets (rows) alphabetically
+    regnet = regnet.sort_index()
+    r_targets, r_tfs = regnet.index, regnet.columns
+
+    assert len(r_targets) == len(set(r_targets)), 'regnet target names are not unique'
+    assert len(r_tfs) == len(set(r_tfs)), 'regnet tf names are not unique'
+
+    # Subset by common genes
+    common_genes = np.sort(list(set(r_targets) & set(x_genes)))
+
+    target_fraction = len(common_genes) / len(r_targets)
+    assert target_fraction > .05, f'Too few ({len(common_genes)}) target genes found. \
+    Make sure you are using the correct organism.'
+
+    idx_x = np.searchsorted(x_genes, common_genes)
+    X = X[:,idx_x]
+    R = regnet.loc[common_genes].values
+    R = R[:,list(r_tfs).index(tf)]
+
+    X = X[:,R!=0]
+    common_genes = common_genes[R!=0]
+    
+    sort_genes = np.argsort(np.mean(X*-1,axis=0)).flat
+    X = X[:,sort_genes]
+    common_genes = common_genes[sort_genes]
+    
+    groups = np.unique(adata.obs[groupby])
+    fig, axes = plt.subplots(len(groups), 1, 
+                             gridspec_kw={'hspace': 0.05}, 
+                             sharex=True,
+                             figsize=figsize
+                            )
+    fig.suptitle(tf, fontsize=16)
+    axes = axes.flatten()
+    max_n = np.max(X)
+    min_n = np.min(X)
+    i = 1
+    X = pd.DataFrame(X.A, columns=common_genes)
+    for group,ax in zip(groups, axes):
+        msk = (adata.obs[groupby] == group).values
+        if i == len(groups):
+            sns.heatmap(X.loc[msk], cbar=True,
+                        yticklabels='', ax=ax, vmin=min_n, vmax=max_n,
+                        cbar_kws = {"shrink": .70}, cmap=cmap
+                       )
+        else:
+            sns.heatmap(X.loc[msk], cbar=True,
+                        yticklabels='', ax=ax, vmin=min_n, vmax=max_n,
+                        cbar_kws = {"shrink": .70}, cmap=cmap
+                       )
+            ax.axes.xaxis.set_visible(False)
+        ax.set_ylabel(group, rotation='horizontal', ha='right')
+        i += 1
+    if return_fig is True:
+        return fig
+    if show is False:
+        return axes
+    plt.show()
