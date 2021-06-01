@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.sparse import csr_matrix
+from scipy.sparse import issparse
 import scanpy as sc
 from anndata import AnnData
 import pickle
@@ -137,7 +138,9 @@ def process_input(data, use_raw=False, use_hvg=False):
         X = np.array(data)[:,idx]
     else:
         raise ValueError('Input must be AnnData or pandas DataFrame.')
-    return genes, samples, csr_matrix(X)
+    if not issparse(X):
+        X = csr_matrix(X)
+    return genes, samples, X
 
 def dot_mult(X, R):
     # Run matrix mult
@@ -209,6 +212,9 @@ def run(data, regnet, center=True, num_perm=0, norm=True, scale=True, scale_axis
     # Center gene expresison by cell
     if center:
         X = center_arr(X)
+    
+    # Back to normal arr
+    X = X.A
 
     # Sort targets (rows) alphabetically
     regnet = regnet.sort_index()
